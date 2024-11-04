@@ -16,6 +16,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
 import model.Hoa;
 
@@ -38,10 +39,17 @@ public class ManagerProduct extends HttpServlet {
      */
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        //kiểm tra thông tin lịch sử đăng nhập
+        HttpSession session = request.getSession();
+        if(session.getAttribute("username")==null){
+            request.getRequestDispatcher("login.jsp").forward(request, response);
+        }
         response.setContentType("text/html;charset=UTF-8");
 
         HoaDAO hoaDAO = new HoaDAO();
         LoaiDAO loaiDAO = new LoaiDAO();
+
+        String method = request.getMethod();
 
         String action = "LIST";
         if (request.getParameter("action") != null) {
@@ -50,11 +58,20 @@ public class ManagerProduct extends HttpServlet {
         switch (action) {
             case "LIST":
                 //Tra ve giao dien liet ke danh sach san pham quan tri
-                request.setAttribute("dsHoa", hoaDAO.getAll());
+                int pageSize = 5;
+                int pageIndex = 1;
+                if(request.getParameter("page")!=null){
+                    pageIndex= Integer.parseInt(request.getParameter("page"));
+                }
+                //tính tổng số trang có thể có
+                int sumOfPage = (int) Math.ceil((double) hoaDAO.getAll().size()/pageSize);
+                request.setAttribute("sumOfPage", sumOfPage);
+                request.setAttribute("pageIndex", pageIndex);
+                
+                request.setAttribute("dsHoa", hoaDAO.getByPage(pageIndex, pageSize));
                 request.getRequestDispatcher("admin/list_product.jsp").forward(request, response);
                 break;
             case "ADD":
-                String method = request.getMethod();
                 if (method.equalsIgnoreCase("get")) {
                     //tra ve gioa dien them moi san pham
                     request.setAttribute("dsLoai", loaiDAO.getAll());
@@ -85,15 +102,15 @@ public class ManagerProduct extends HttpServlet {
                 }
                 break;
             case "EDIT":
-                method = request.getMethod();
+                //Tra ve giao dien cap nhat san pham
                 if (method.equalsIgnoreCase("get")) {
-                    //tra ve giao dien cap nhat san pham
                     int mahoa = Integer.parseInt(request.getParameter("mahoa"));
                     request.setAttribute("hoa", hoaDAO.getById(mahoa));
                     request.setAttribute("dsLoai", loaiDAO.getAll());
                     request.getRequestDispatcher("admin/edit_product.jsp").forward(request, response);
-                } else if (method.equalsIgnoreCase("post")) {
-                    // xu ly cap nhat sp
+                } else {
+                    //xu ly cap nhat san pham
+                    //b1 Lay thong tin san pham
                     int mahoa = Integer.parseInt(request.getParameter("mahoa"));
                     String tenhoa = request.getParameter("tenhoa");
                     double gia = Double.parseDouble(request.getParameter("gia"));
@@ -107,14 +124,15 @@ public class ManagerProduct extends HttpServlet {
                         filename = Paths.get(part.getSubmittedFileName()).getFileName().toString();
                         part.write(realpath + "/" + filename);
                     }
+
                     //3. Cap nhat san pham vao CSDL
                     Hoa objUpdate = new Hoa(mahoa, tenhoa, gia, filename, maloai, new Date(new java.util.Date().getTime()));
                     if (hoaDAO.Update(objUpdate)) {
                         //thong bao them thanh cong
-                        request.setAttribute("success", "Thao tac them san pham thanh cong");
+                        request.setAttribute("success", "Thao tac cap nhat san pham thanh cong");
                     } else {
                         //thong bao them that bai
-                        request.setAttribute("orror", "Thao tac them san pham that bai");
+                        request.setAttribute("error", "Thao tac cap nhat san pham that bai");
                     }
                     request.getRequestDispatcher("ManagerProduct?action=LIST").forward(request, response);
                 }
@@ -128,7 +146,7 @@ public class ManagerProduct extends HttpServlet {
                     request.setAttribute("success", "Thao tac xoa san pham thanh cong");
                 } else {
                     //thong bao them that bai
-                    request.setAttribute("error", "Thao tac xoa san pham that bai");
+                    request.setAttribute("orror", "Thao tac xoa san pham that bai");
                 }
                 request.getRequestDispatcher("ManagerProduct?action=LIST").forward(request, response);
                 break;
